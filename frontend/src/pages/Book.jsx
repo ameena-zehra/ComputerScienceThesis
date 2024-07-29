@@ -50,33 +50,59 @@ class Book extends React.Component {
   };
 
   downloadPDF = async () => {
-    const { title, pages } = this.parseStory(this.props.location.state.story);
-    const pdf = new jsPDF();
+    try {
+      const { title, pages } = this.parseStory(this.props.location.state.story);
+      console.log("Download PDF");
+      const pdf = new jsPDF();
+      pdf.setFontSize(32);
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const textWidth =
+        (pdf.getStringUnitWidth(title) * pdf.internal.getFontSize()) /
+        pdf.internal.scaleFactor;
+      const textOffset = (pageWidth - textWidth) / 2;
 
-    // Include cover page with title and image
+      pdf.text(title, textOffset, 30); // Add the title to the first page at Y position 30
 
-    pdf.setFontSize(22);
-    pdf.text({ title }, 20, 20);
-    pdf.setFontSize(16);
-    for (let i = 0; i < pages.length; i++) {
-      const pageElement = document.getElementById(`page-${i}`);
-      if (pageElement) {
-        console.log("got page-", i, "element");
-        pageElement.style.display = "block"; // Ensure the element is visible
-        const canvas = await html2canvas(pageElement);
-        const imgData = canvas.toDataURL("image/jpeg"); // Ensure the image format is correct
+      // Adding a new page for the content
+      pdf.addPage();
 
-        const imgProps = pdf.getImageProperties(imgData);
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+      for (let i = 0; i < pages.length; i++) {
+        const pageElement = document.getElementById(`page-${i}`);
+        console.log(pageElement);
+        if (pageElement) {
+          console.log("got page-", i, "element");
+          pageElement.style.display = "block"; // Ensure the element is visible
 
-        if (i > 0) pdf.addPage();
-        pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, pdfHeight);
-        pageElement.style.display = "none"; // Hide the element again
+          try {
+            const canvas = await html2canvas(pageElement);
+            const imgData = canvas.toDataURL("image/jpeg"); // Ensure the image format is correct
+
+            const imgProps = pdf.getImageProperties(imgData);
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+            if (i > 0) pdf.addPage();
+
+            pdf.setFontSize(22);
+
+            pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, pdfHeight);
+          } catch (canvasError) {
+            console.error(
+              "Error capturing page element as canvas:",
+              canvasError
+            );
+          } finally {
+            pageElement.style.display = "none"; // Hide the element again
+          }
+        } else {
+          console.warn(`Page element with id page-${i} not found`);
+        }
       }
-    }
 
-    pdf.save(`${title}.pdf`);
+      pdf.save(`${title}.pdf`);
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+    }
   };
 
   parseStory = (story) => {
@@ -116,6 +142,18 @@ class Book extends React.Component {
               onClick={prevPageClick}
             >
               Try Again
+            </Button>
+            <Button
+              sx={{
+                marginBottom: "20px",
+                marginTop: "20px",
+                marginLeft: "55px",
+              }}
+              variant="round"
+              size="medium"
+              onClick={this.downloadPDF}
+            >
+              Download
             </Button>
             <HTMLFlipBook
               width={500}
